@@ -1,5 +1,6 @@
 # httpx
 
+[![godoc](https://img.shields.io/badge/godoc-reference-blue.svg?style=for-the-badge)](https://godoc.org/github.com/krostar/httpx)
 [![Licence](https://img.shields.io/github/license/krostar/httpx.svg?style=for-the-badge)](https://tldrlegal.com/license/mit-license)
 ![Latest version](https://img.shields.io/github/tag/krostar/httpx.svg?style=for-the-badge)
 
@@ -51,6 +52,8 @@ func main() {
     }
 }
 ```
+
+More doc and examples in the httpx's [godoc](https://godoc.org/github.com/krostar/httpx)
 
 ## License
 
