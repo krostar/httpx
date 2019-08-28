@@ -27,10 +27,11 @@ The code below ...
 -   sets a keepalive, and configures a period for it, [see this blog on cloudflare](https://blog.cloudflare.com/exposing-go-on-the-internet/)
     to get why it can be important)
 -   start the server and set two signals to gracefully stop it
+-   makes a call to the started server, and checks the response
 -   is heavility tested ;)
 
 ```go
-func main() {
+func setupServer() {
     server, err := httpx.NewServer(initRoutes(usecases))
     if err != nil {
         panic("unable to create server")
@@ -51,9 +52,26 @@ func main() {
         panic(err)
     }
 }
+
+func main() {
+    setupServer()
+
+    go func() {
+        var result requestRespont
+        if err := request.
+            Get("http://:8080/api/v1/dosomething").
+            Send(context.Background()).
+            Status2xx().
+            BindJSON(&result).
+            Error(); err != nil {
+            panic(err)
+        }
+        // result is usable
+    }
+}
 ```
 
-More doc and examples in the httpx's [godoc](https://godoc.org/github.com/krostar/httpx)
+More doc and examples in the httpx's [godoc](https://godoc.org/github.com/krostar/httpx) and request's [godoc](https://godoc.org/github.com/krostar/httpx/request)
 
 ## License
 

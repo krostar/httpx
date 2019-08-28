@@ -1,6 +1,7 @@
 package httpx
 
 import (
+	"context"
 	"crypto/tls"
 	"net"
 	"time"
@@ -11,7 +12,7 @@ import (
 // NewListener returns a new listener. The built listener can be
 // customized (keepalive duration, tls config, ...) via options.
 // Default (no options) is valid and probably enough for most servers.
-func NewListener(address string, opts ...ListenerOption) (net.Listener, error) {
+func NewListener(ctx context.Context, address string, opts ...ListenerOption) (net.Listener, error) {
 	var o = listenerOptions{
 		network:   "tcp4",
 		keepAlive: 1 * time.Minute,
@@ -23,7 +24,8 @@ func NewListener(address string, opts ...ListenerOption) (net.Listener, error) {
 		}
 	}
 
-	l, err := net.Listen(o.network, address)
+	var lc net.ListenConfig
+	l, err := lc.Listen(ctx, o.network, address)
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to listen on %s", address)
 	}

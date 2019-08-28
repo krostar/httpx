@@ -18,7 +18,7 @@ func TestStartAndStopWithSignal(t *testing.T) {
 	}))
 	defer srv.Shutdown(context.Background()) // nolint: errcheck
 
-	listener, err := NewListener(":0")
+	listener, err := NewListener(context.Background(), ":0")
 	require.NoError(t, err)
 	defer listener.Close() // nolint: errcheck
 
@@ -39,7 +39,7 @@ func TestStartAndStopWithSignal_timeout(t *testing.T) {
 	}))
 	defer srv.Shutdown(context.Background()) // nolint: errcheck
 
-	listener, err := NewListener(":0")
+	listener, err := NewListener(context.Background(), ":0")
 	require.NoError(t, err)
 	defer listener.Close() // nolint: errcheck
 

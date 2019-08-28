@@ -1,6 +1,7 @@
 package httpx
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"io"
@@ -13,7 +14,7 @@ import (
 )
 
 func TestNewListener(t *testing.T) {
-	l, err := NewListener(":0")
+	l, err := NewListener(context.Background(), ":0")
 	require.NoError(t, err)
 	defer l.Close() // nolint: errcheck
 
@@ -36,7 +37,8 @@ func TestNewListener(t *testing.T) {
 }
 
 func TestNewListener_with_tls(t *testing.T) {
-	l, err := NewListener(":0", ListenWithModernTLSConfig("./testdata/cert.crt", "./testdata/cert.key"))
+	ctx := context.Background()
+	l, err := NewListener(ctx, ":0", ListenWithModernTLSConfig("./testdata/cert.crt", "./testdata/cert.key"))
 	require.NoError(t, err)
 	defer l.Close() // nolint: errcheck
 
@@ -64,6 +66,7 @@ func TestNewListener_with_tls(t *testing.T) {
 }
 
 func TestNewListener_with_bad_tls_config(t *testing.T) {
-	_, err := NewListener(":0", ListenWithModernTLSConfig("dont/exist", "./testdata/cert.key"))
+	ctx := context.Background()
+	_, err := NewListener(ctx, ":0", ListenWithModernTLSConfig("dont/exist", "./testdata/cert.key"))
 	require.Error(t, err)
 }
