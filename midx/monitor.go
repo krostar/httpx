@@ -1,12 +1,13 @@
+// Package midx ...
 package midx
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/krostar/httpinfo"
-	"github.com/pkg/errors"
 	"go.opencensus.io/stats"
 	"go.opencensus.io/stats/view"
 	"go.opencensus.io/tag"
@@ -48,7 +49,7 @@ var (
 func Monitor(opts ...MonitorOption) func(http.Handler) http.Handler {
 	if v := view.Find(httpViews[0].Name); v == nil {
 		if err := view.Register(httpViews...); err != nil {
-			panic(errors.Wrap(err, "unable to register http views"))
+			panic(fmt.Errorf("unable to register http views: %w", err))
 		}
 	}
 

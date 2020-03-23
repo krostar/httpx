@@ -3,10 +3,9 @@ package httpx
 import (
 	"context"
 	"crypto/tls"
+	"fmt"
 	"net"
 	"time"
-
-	"github.com/pkg/errors"
 )
 
 // NewListener returns a new listener. The built listener can be
@@ -20,19 +19,17 @@ func NewListener(ctx context.Context, address string, opts ...ListenerOption) (n
 
 	for _, opt := range opts {
 		if err := opt(&o); err != nil {
-			return nil, errors.Wrap(err, "unable to apply option")
+			return nil, fmt.Errorf("unable to apply option: %w", err)
 		}
 	}
 
-	var lc net.ListenConfig
-	l, err := lc.Listen(ctx, o.network, address)
-	if err != nil {
-		return nil, errors.Wrapf(err, "unable to listen on %s", address)
+	lc := net.ListenConfig{
+		KeepAlive: o.keepAlive,
 	}
 
-	l = tcpListenerKeepAlive{
-		TCPListener: l.(*net.TCPListener),
-		period:      o.keepAlive, // if period is 0, keepalive is disabled
+	l, err := lc.Listen(ctx, o.network, address)
+	if err != nil {
+		return nil, fmt.Errorf("unable to listen on %s: %w", address, err)
 	}
 
 	if o.tlsConfig != nil {

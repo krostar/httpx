@@ -18,7 +18,7 @@ type Tracer struct {
 
 // NewTracer creates a new tracer with the provided options.
 func NewTracer(opts ...TracerOption) *Tracer {
-	var tracer = Tracer{
+	tracer := Tracer{
 		propagation: &b3.HTTPFormat{},
 		sampler:     trace.AlwaysSample(),
 	}
@@ -52,14 +52,14 @@ func (t Tracer) Trace(opts ...TracerOption) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 			const spanName = "delivery.http"
-			var (
-				ctx       = r.Context()
-				startOpts = []trace.StartOption{
-					trace.WithSpanKind(trace.SpanKindServer),
-					trace.WithSampler(t.sampler),
-				}
-				span *trace.Span
-			)
+			var span *trace.Span
+
+			ctx := r.Context()
+
+			startOpts := []trace.StartOption{
+				trace.WithSpanKind(trace.SpanKindServer),
+				trace.WithSampler(t.sampler),
+			}
 
 			if spanCtx, ok := t.propagation.SpanContextFromRequest(r); ok {
 				ctx, span = trace.StartSpanWithRemoteParent(ctx, spanName, spanCtx, startOpts...)

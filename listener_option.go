@@ -2,9 +2,8 @@ package httpx
 
 import (
 	"crypto/tls"
+	"fmt"
 	"time"
-
-	"github.com/pkg/errors"
 )
 
 type listenerOptions struct {
@@ -29,7 +28,7 @@ func ListenWithModernTLSConfig(certFile, keyFile string) ListenerOption {
 	return func(o *listenerOptions) error {
 		cert, err := tls.LoadX509KeyPair(certFile, keyFile)
 		if err != nil {
-			return errors.Wrap(err, "unable to load tls key pair")
+			return fmt.Errorf("unable to load tls key pair: %w", err)
 		}
 
 		o.tlsConfig = new(tls.Config)
@@ -58,7 +57,7 @@ func ListenWithKeepAlive(keepPeriod time.Duration) ListenerOption {
 // ListenWithoutKeepAlive disables the keepalive on the listener.
 func ListenWithoutKeepAlive() ListenerOption {
 	return func(o *listenerOptions) error {
-		o.keepAlive = 0
+		o.keepAlive = -1
 		return nil
 	}
 }

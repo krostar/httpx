@@ -20,10 +20,9 @@ func TestServerWithModernTLSConfig(t *testing.T) {
 }
 
 func TestServerWithTLSConfig(t *testing.T) {
-	var (
-		o   serverOptions
-		cfg = &tls.Config{ServerName: "hello"}
-	)
+	var o serverOptions
+
+	cfg := &tls.Config{ServerName: "hello"}
 
 	ServerWithTLSConfig(cfg)(&o)
 	assert.Equal(t, cfg, o.tlsConfig)

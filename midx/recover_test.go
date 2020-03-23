@@ -10,13 +10,9 @@ import (
 )
 
 func TestPanic_withDefaultCallback(t *testing.T) {
-	var (
-		handler = func(w http.ResponseWriter, r *http.Request) {
-			panic("eww.")
-		}
-		r = httptest.NewRequest("", "/", nil)
-		w = httptest.NewRecorder()
-	)
+	handler := func(w http.ResponseWriter, r *http.Request) { panic("eww.") }
+	r := httptest.NewRequest("", "/", nil)
+	w := httptest.NewRecorder()
 
 	require.NotPanics(t, func() {
 		Recover()(http.HandlerFunc(handler)).ServeHTTP(w, r)
@@ -26,13 +22,9 @@ func TestPanic_withDefaultCallback(t *testing.T) {
 }
 
 func TestPanic_withCallback(t *testing.T) {
-	var (
-		handler = func(w http.ResponseWriter, r *http.Request) {
-			panic("eww.")
-		}
-		r = httptest.NewRequest("", "/", nil)
-		w = httptest.NewRecorder()
-	)
+	handler := func(w http.ResponseWriter, r *http.Request) { panic("eww.") }
+	r := httptest.NewRequest("", "/", nil)
+	w := httptest.NewRecorder()
 
 	require.NotPanics(t, func() {
 		Recover(func(w http.ResponseWriter, _ *http.Request, reason interface{}, _ []byte) {

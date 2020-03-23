@@ -31,14 +31,13 @@ The code below ...
 -   is heavility tested ;)
 
 ```go
-func setupServer() {
+func main() {
     server, err := httpx.NewServer(initRoutes(usecases))
     if err != nil {
         panic("unable to create server")
     }
-    server.ErrorLog = logger.StdLog(
-        log.WithField("source", "http-error"), logger.LevelWarn,
-    )
+
+    server.ErrorLog = logger.StdLog(log.WithField("source", "http-error"), logger.LevelWarn)
 
     listener, err := httpx.NewListener(":8080",
         httpx.ListenWithKeepAlive(time.Second * 45),
@@ -52,26 +51,9 @@ func setupServer() {
         panic(err)
     }
 }
-
-func main() {
-    setupServer()
-
-    go func() {
-        var result requestRespont
-        if err := request.
-            Get("http://:8080/api/v1/dosomething").
-            Send(context.Background()).
-            Status2xx().
-            BindJSON(&result).
-            Error(); err != nil {
-            panic(err)
-        }
-        // result is usable
-    }
-}
 ```
 
-More doc and examples in the httpx's [godoc](https://godoc.org/github.com/krostar/httpx) and request's [godoc](https://godoc.org/github.com/krostar/httpx/request)
+More doc and examples in the httpx's [godoc](https://godoc.org/github.com/krostar/httpx).
 
 ## License
 

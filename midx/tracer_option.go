@@ -26,15 +26,11 @@ func TracerWithProbabilitySampler(fraction float64) TracerOption {
 
 // TracerWithSampler sets the sampler of the tracer.
 func TracerWithSampler(sampler trace.Sampler) TracerOption {
-	return func(o *Tracer) {
-		o.sampler = sampler
-	}
+	return func(o *Tracer) { o.sampler = sampler }
 }
 
 // TracerWithCallback sets function that will be called
 // at the end of the request in the tracer.
 func TracerWithCallback(fcts ...func(r *http.Request, span *trace.Span)) TracerOption {
-	return func(o *Tracer) {
-		o.callback = append(o.callback, fcts...)
-	}
+	return func(o *Tracer) { o.callback = append(o.callback, fcts...) }
 }

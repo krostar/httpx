@@ -16,7 +16,7 @@ type mapExporter map[string]*trace.SpanData
 func (e mapExporter) ExportSpan(s *trace.SpanData) { e[s.Name] = s }
 
 func TestTracer_Trace(t *testing.T) {
-	var spans = make(mapExporter)
+	spans := make(mapExporter)
 	trace.RegisterExporter(&spans)
 	defer trace.UnregisterExporter(&spans)
 
@@ -47,27 +47,31 @@ func TestTracer_Trace(t *testing.T) {
 }
 
 func TestHTTPTracer_Trace_override_options(t *testing.T) {
-	var (
-		spans   = make(mapExporter)
-		tracer  = NewTracer(TracerWithAlwaysSampler())
-		handler = http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
-			_, span := trace.StartSpan(r.Context(), "my-super-job")
-			defer span.End()
-			rw.WriteHeader(http.StatusAccepted)
-		})
-	)
+	spans := make(mapExporter)
+	tracer := NewTracer(TracerWithAlwaysSampler())
+	handler := http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		_, span := trace.StartSpan(r.Context(), "my-super-job")
+		defer span.End()
+		rw.WriteHeader(http.StatusAccepted)
+	})
 
 	trace.RegisterExporter(&spans)
 	httpinfo.Record()(
 		tracer.Trace(TracerWithNeverSampler())(handler),
-	).ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/toto", nil))
+	).ServeHTTP(
+		httptest.NewRecorder(),
+		httptest.NewRequest(http.MethodGet, "/toto", nil),
+	)
 	trace.UnregisterExporter(&spans)
 	require.Len(t, spans, 0)
 
 	trace.RegisterExporter(&spans)
 	httpinfo.Record()(
 		tracer.Trace()(handler),
-	).ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/toto", nil))
+	).ServeHTTP(
+		httptest.NewRecorder(),
+		httptest.NewRequest(http.MethodGet, "/toto", nil),
+	)
 	trace.UnregisterExporter(&spans)
 	require.Len(t, spans, 2)
 }

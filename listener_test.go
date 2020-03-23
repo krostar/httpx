@@ -13,8 +13,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestNewListener(t *testing.T) {
-	l, err := NewListener(context.Background(), ":0")
+func Test_NewListener(t *testing.T) {
+	l, err := NewListener(context.Background(), "localhost:0")
 	require.NoError(t, err)
 	defer l.Close() // nolint: errcheck
 
@@ -36,9 +36,9 @@ func TestNewListener(t *testing.T) {
 	assert.Equal(t, "hello world", string(read))
 }
 
-func TestNewListener_with_tls(t *testing.T) {
+func Test_NewListener_with_tls(t *testing.T) {
 	ctx := context.Background()
-	l, err := NewListener(ctx, ":0", ListenWithModernTLSConfig("./testdata/cert.crt", "./testdata/cert.key"))
+	l, err := NewListener(ctx, "localhost:0", ListenWithModernTLSConfig("./testdata/cert.crt", "./testdata/cert.key"))
 	require.NoError(t, err)
 	defer l.Close() // nolint: errcheck
 
@@ -65,8 +65,8 @@ func TestNewListener_with_tls(t *testing.T) {
 	assert.Equal(t, "hello world", string(read))
 }
 
-func TestNewListener_with_bad_tls_config(t *testing.T) {
+func Test_NewListener_with_bad_tls_config(t *testing.T) {
 	ctx := context.Background()
-	_, err := NewListener(ctx, ":0", ListenWithModernTLSConfig("dont/exist", "./testdata/cert.key"))
+	_, err := NewListener(ctx, "localhost:0", ListenWithModernTLSConfig("dont/exist", "./testdata/cert.key"))
 	require.Error(t, err)
 }

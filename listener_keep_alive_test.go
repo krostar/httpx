@@ -1,6 +1,7 @@
 package httpx
 
 import (
+	"context"
 	"net"
 	"testing"
 	"time"
@@ -9,25 +10,24 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestTCPListenerKeepAlive_Accept(t *testing.T) {
-	l, err := net.Listen("tcp", "127.0.0.1:0")
-	require.NoError(t, err)
-	defer l.Close() // nolint: errcheck
-
-	lka := tcpListenerKeepAlive{
-		TCPListener: l.(*net.TCPListener),
-		period:      time.Second * 7,
-	}
-
+func Test_NewListener_with_keepalive(t *testing.T) {
 	t.Run("without keepalive", func(t *testing.T) {
+		l, err := NewListener(context.Background(), "localhost:0", ListenWithoutKeepAlive())
+		require.NoError(t, err)
+		defer l.Close() // nolint: errcheck
+
 		activated, _ := tcpGetKeepAliveSockOPT(t, l)
 		assert.False(t, activated, "keepalive should not be set with normal listener")
 	})
 
 	t.Run("with keepalive", func(t *testing.T) {
-		activated, period := tcpGetKeepAliveSockOPT(t, lka)
+		l, err := NewListener(context.Background(), "localhost:0", ListenWithKeepAlive(17*time.Second))
+		require.NoError(t, err)
+		defer l.Close() // nolint: errcheck
+
+		activated, period := tcpGetKeepAliveSockOPT(t, l)
 		assert.True(t, activated, "keepalive should have been set")
-		assert.Equal(t, 7, period)
+		assert.Equal(t, 17, period)
 	})
 }
 
