@@ -5,68 +5,86 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"io"
-	"io/ioutil"
 	"net"
+	"os"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"gotest.tools/v3/assert"
 )
 
 func Test_NewListener(t *testing.T) {
-	l, err := NewListener(context.Background(), "localhost:0")
-	require.NoError(t, err)
-	defer l.Close() // nolint: errcheck
+	t.Run("no tls", func(t *testing.T) {
+		var l net.Listener
+		{
+			var err error
+			l, err = NewListener(context.Background(), "localhost:0")
+			assert.NilError(t, err)
+		}
 
-	go func() {
-		conn, err := net.Dial("tcp4", l.Addr().String())
-		require.NoError(t, err)
-		defer conn.Close() // nolint: errcheck
+		go func() {
+			conn, err := net.Dial("tcp4", l.Addr().String())
+			assert.NilError(t, err)
+			_, err = io.WriteString(conn, "hello world")
+			assert.NilError(t, err)
+			assert.NilError(t, conn.Close())
+		}()
 
-		_, err = io.WriteString(conn, "hello world")
-		require.NoError(t, err)
-	}()
+		conn, err := l.Accept()
+		assert.NilError(t, err)
 
-	conn, err := l.Accept()
-	require.NoError(t, err)
-	defer conn.Close() // nolint: errcheck
+		read, err := io.ReadAll(conn)
+		assert.NilError(t, err)
+		assert.Equal(t, "hello world", string(read))
 
-	read, err := ioutil.ReadAll(conn)
-	require.NoError(t, err)
-	assert.Equal(t, "hello world", string(read))
-}
+		assert.NilError(t, conn.Close())
+		assert.NilError(t, l.Close())
+	})
 
-func Test_NewListener_with_tls(t *testing.T) {
-	ctx := context.Background()
-	l, err := NewListener(ctx, "localhost:0", ListenWithModernTLSConfig("./testdata/cert.crt", "./testdata/cert.key"))
-	require.NoError(t, err)
-	defer l.Close() // nolint: errcheck
+	t.Run("tls", func(t *testing.T) {
+		var l net.Listener
+		{
+			var err error
+			l, err = NewListener(context.Background(), "localhost:0", ListenWithIntermediateTLSConfig("./testdata/cert.crt", "./testdata/cert.key"))
+			assert.NilError(t, err)
+		}
 
-	go func() {
-		rootCAPEM, err := ioutil.ReadFile("./testdata/ca.crt")
-		require.NoError(t, err)
-		rootCAs := x509.NewCertPool()
-		require.True(t, rootCAs.AppendCertsFromPEM(rootCAPEM))
+		go func() {
+			rootCAPEM, err := os.ReadFile("./testdata/ca.crt")
+			assert.NilError(t, err)
+			rootCAs := x509.NewCertPool()
+			assert.Check(t, rootCAs.AppendCertsFromPEM(rootCAPEM))
 
-		conn, err := tls.Dial("tcp4", l.Addr().String(), &tls.Config{RootCAs: rootCAs, ServerName: "go-test"})
-		require.NoError(t, err)
-		defer conn.Close() // nolint: errcheck
+			conn, err := tls.Dial(l.Addr().Network(), l.Addr().String(), &tls.Config{
+				RootCAs: rootCAs, ServerName: "foo.bar", MinVersion: tls.VersionTLS12,
+			})
+			assert.NilError(t, err)
 
-		_, err = io.WriteString(conn, "hello world")
-		require.NoError(t, err)
-	}()
+			_, err = io.WriteString(conn, "hello world")
+			assert.NilError(t, err)
+			assert.NilError(t, conn.Close())
+		}()
 
-	conn, err := l.Accept()
-	require.NoError(t, err)
-	defer conn.Close() // nolint: errcheck
+		conn, err := l.Accept()
+		assert.NilError(t, err)
 
-	read, err := ioutil.ReadAll(conn)
-	require.NoError(t, err)
-	assert.Equal(t, "hello world", string(read))
-}
+		read, err := io.ReadAll(conn)
+		assert.NilError(t, err)
+		assert.Equal(t, "hello world", string(read))
 
-func Test_NewListener_with_bad_tls_config(t *testing.T) {
-	ctx := context.Background()
-	_, err := NewListener(ctx, "localhost:0", ListenWithModernTLSConfig("dont/exist", "./testdata/cert.key"))
-	require.Error(t, err)
+		assert.NilError(t, conn.Close())
+		assert.NilError(t, l.Close())
+	})
+
+	t.Run("bad option", func(t *testing.T) {
+		_, err := NewListener(context.Background(), "localhost:0", ListenWithIntermediateTLSConfig("dont/exist", "./testdata/cert.key"))
+		assert.ErrorContains(t, err, "unable to apply option")
+	})
+
+	t.Run("unable to listen", func(t *testing.T) {
+		l, err := NewListener(context.Background(), "localhost:0")
+		assert.NilError(t, err)
+		_, err = NewListener(context.Background(), l.Addr().String())
+		assert.ErrorContains(t, err, "unable to listen")
+		assert.NilError(t, l.Close())
+	})
 }

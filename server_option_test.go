@@ -1,29 +1,16 @@
 package httpx
 
 import (
-	"crypto/tls"
+	"log"
+	"os"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"gotest.tools/v3/assert"
 )
 
-func TestServerWithModernTLSConfig(t *testing.T) {
-	var (
-		o   serverOptions
-		cfg tls.Config
-	)
-
-	tlsSetModernConfig(&cfg)
-
-	ServerWithModernTLSConfig()(&o)
-	assert.Equal(t, &cfg, o.tlsConfig)
-}
-
-func TestServerWithTLSConfig(t *testing.T) {
+func Test_ServerWithErrorLogger(t *testing.T) {
 	var o serverOptions
 
-	cfg := &tls.Config{ServerName: "hello"}
-
-	ServerWithTLSConfig(cfg)(&o)
-	assert.Equal(t, cfg, o.tlsConfig)
+	ServerWithErrorLogger(log.New(os.Stderr, "http", 0))(&o)
+	assert.Check(t, o.errorLogger != nil)
 }

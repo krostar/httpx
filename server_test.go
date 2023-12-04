@@ -2,134 +2,125 @@ package httpx
 
 import (
 	"context"
-	"crypto/tls"
-	"crypto/x509"
-	"io/ioutil"
+	"errors"
 	"net"
 	"net/http"
-	"os"
-	"sync"
-	"syscall"
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"golang.org/x/sync/errgroup"
+	"gotest.tools/v3/assert"
 )
 
 func Test_NewServer(t *testing.T) {
-	srv := NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+	srv := NewServer(func(rw http.ResponseWriter, r *http.Request) {
 		rw.WriteHeader(http.StatusCreated)
-	}))
+	}, ServerWithErrorLogger(nil))
 
 	l, err := net.Listen("tcp", "localhost:0")
-	require.NoError(t, err)
+	assert.NilError(t, err)
 
 	go func() {
-		defer srv.Shutdown(context.Background()) // nolint: errcheck
-		resp, err := http.Get("http://" + l.Addr().String())
-		require.NoError(t, err)
-		require.NoError(t, resp.Body.Close())
+		resp, err := http.DefaultClient.Get("http://" + l.Addr().String())
+		assert.NilError(t, err)
 		assert.Equal(t, resp.StatusCode, http.StatusCreated)
+		assert.NilError(t, srv.Shutdown(context.Background()))
 	}()
 
-	assert.Equal(t, http.ErrServerClosed, srv.Serve(l))
-}
-
-func TestNewServer_with_tls(t *testing.T) {
-	srv := NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
-		rw.WriteHeader(http.StatusCreated)
-	}), ServerWithModernTLSConfig())
-	srv.Addr = ":7777"
-
-	go func() {
-		defer srv.Shutdown(context.Background()) // nolint: errcheck
-
-		rootCAPEM, err := ioutil.ReadFile("./testdata/ca.crt")
-		require.NoError(t, err)
-		rootCAs := x509.NewCertPool()
-		require.True(t, rootCAs.AppendCertsFromPEM(rootCAPEM))
-
-		var client http.Client
-		client.Transport = &http.Transport{TLSClientConfig: &tls.Config{RootCAs: rootCAs, ServerName: "go-test"}}
-		resp, err := client.Get("https://:7777")
-		require.NoError(t, err)
-		require.NoError(t, resp.Body.Close())
-		require.NotNil(t, resp.TLS)
-		assert.Equal(t, resp.StatusCode, http.StatusCreated)
-	}()
-
-	assert.Equal(t, http.ErrServerClosed, srv.ListenAndServeTLS("./testdata/cert.crt", "./testdata/cert.key"))
+	assert.ErrorIs(t, srv.Serve(l), http.ErrServerClosed)
 }
 
 func Test_Serve(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	t.Run("ok", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
 
-	l, err := NewListener(ctx, "localhost:0")
-	require.NoError(t, err)
-	defer l.Close() // nolint: errcheck
+		l, err := NewListener(ctx, "localhost:0")
+		assert.NilError(t, err)
+		addr := l.Addr().String()
 
-	addr := l.Addr().String()
-
-	var wg sync.WaitGroup
-	wg.Add(1)
-
-	go func() {
-		defer wg.Done()
-		err := Serve(ctx, &http.Server{
-			Addr: addr,
-			Handler: http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		var wg errgroup.Group
+		wg.Go(func() error {
+			srv := NewServer(func(rw http.ResponseWriter, r *http.Request) {
 				rw.WriteHeader(http.StatusTeapot)
-			}),
-		}, l, time.Second)
-		require.NoError(t, err)
-	}()
+			})
+			return Serve(ctx, srv, l, time.Second)
+		})
 
-	resp, err := http.DefaultClient.Get("http://" + addr)
-	require.NoError(t, err)
-	assert.Equal(t, http.StatusTeapot, resp.StatusCode)
-	require.NoError(t, resp.Body.Close())
+		resp, err := http.DefaultClient.Get("http://" + addr)
+		assert.NilError(t, err)
+		assert.Equal(t, resp.StatusCode, http.StatusTeapot)
 
-	cancel()
+		cancel()
+		assert.NilError(t, wg.Wait())
+	})
 
-	wg.Wait()
-}
+	t.Run("unable to serve", func(t *testing.T) {
+		ctx := context.Background()
 
-func Test_Serve_with_cancellable_context(t *testing.T) {
-	ctx, cancel := ContextCancelableBySignal(context.Background(), syscall.SIGUSR1, syscall.SIGUSR2)
-	defer cancel()
+		srv := NewServer(func(rw http.ResponseWriter, r *http.Request) { rw.WriteHeader(http.StatusTeapot) })
 
-	l, err := NewListener(ctx, "localhost:0")
-	require.NoError(t, err)
-	defer l.Close() // nolint: errcheck
+		l, err := NewListener(ctx, "localhost:0")
+		assert.NilError(t, err)
 
-	var wg sync.WaitGroup
-	wg.Add(2)
+		assert.ErrorContains(t, Serve(ctx, srv, listenerFail{Listener: l}, time.Second), "unable to serve listener")
+	})
 
-	go func() {
-		defer wg.Done()
-		resp, err := http.Get("http://" + l.Addr().String())
-		require.NoError(t, err)
-		require.NoError(t, resp.Body.Close())
-	}()
+	t.Run("unable to shutdown", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
 
-	go func() {
-		defer wg.Done()
-		time.Sleep(10 * time.Millisecond)
-		syscall.Kill(os.Getpid(), syscall.SIGUSR2) // nolint: errcheck, gosec
-	}()
+		srv := NewServer(func(rw http.ResponseWriter, r *http.Request) {
+			cancel()
+			reqCtx, cancelReqCtx := context.WithTimeout(r.Context(), time.Second*2)
+			defer cancelReqCtx()
+			<-reqCtx.Done()
+		})
 
-	require.NoError(t, Serve(ctx, NewServer(nil), l, time.Millisecond))
-	wg.Wait()
+		l, err := NewListener(context.Background(), "localhost:0")
+		assert.NilError(t, err)
+
+		var wg errgroup.Group
+		wg.Go(func() error {
+			err := Serve(ctx, srv, l, time.Second)
+			return err
+		})
+		wg.Go(func() error {
+			_, err := http.DefaultClient.Get("http://" + l.Addr().String())
+			return err
+		})
+
+		assert.ErrorContains(t, wg.Wait(), "unable to shut server down")
+	})
 }
 
 func Test_ListenAndServe(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	go func() {
-		time.Sleep(time.Second)
-		cancel()
-	}()
+	t.Run("ok", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
 
-	err := ListenAndServe(ctx, &http.Server{Addr: "localhost:0"})
-	require.NoError(t, err)
+		var wg errgroup.Group
+		wg.Go(func() error {
+			return ListenAndServe(ctx, "localhost:0", func(rw http.ResponseWriter, r *http.Request) {
+				rw.WriteHeader(http.StatusTeapot)
+			})
+		})
+
+		time.Sleep(time.Second * 2)
+		cancel()
+
+		assert.NilError(t, wg.Wait())
+	})
+
+	t.Run("ko", func(t *testing.T) {
+		ctx := context.Background()
+
+		l, err := NewListener(ctx, "localhost:0")
+		assert.NilError(t, err)
+
+		assert.ErrorContains(t, ListenAndServe(ctx, l.Addr().String(), nil), "unable to listen")
+	})
 }
+
+type listenerFail struct {
+	net.Listener
+}
+
+func (listenerFail) Accept() (net.Conn, error) { return nil, errors.New("boom") }
